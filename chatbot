@@ -1,0 +1,38 @@
+import numpy as np
+from keras.preprocessing.text import Tokenizer
+from keras.preprocessing.sequence import pad_sequences
+from keras.models import Model, Sequential
+from keras.layers import Input, LSTM, Dense, Embedding, Bidirectional
+from keras.optimizers import Adam
+
+# Load the data
+questions = np.load('questions.npy')
+answers = np.load('answers.npy')
+
+# Tokenize the questions and answers
+tokenizer = Tokenizer()
+tokenizer.fit_on_texts(questions + answers)
+question_sequences = tokenizer.texts_to_sequences(questions)
+answer_sequences = tokenizer.texts_to_sequences(answers)
+
+# Pad the sequences
+max_length = max(len(max(question_sequences, key=len)), len(max(answer_sequences, key=len)))
+question_sequences = pad_sequences(question_sequences, maxlen=max_length)
+answer_sequences = pad_sequences(answer_sequences, maxlen=max_length)
+
+# Create the encoder
+encoder_inputs = Input(shape=(None,))
+encoder_embedding = Embedding(input_dim=len(tokenizer.word_index)+1, output_dim=128)(encoder_inputs)
+encoder = LSTM(256, return_state=True)
+encoder_outputs, state_h, state_c = encoder(encoder_embedding)
+encoder_states = [state_h, state_c]
+
+# Create the decoder
+decoder_inputs = Input(shape=(None,))
+decoder_embedding = Embedding(input_dim=len(tokenizer.word_index)+1, output_dim=128)(decoder_inputs)
+decoder_lstm = LSTM(256, return_sequences=True, return_state=True)
+decoder_outputs, _, _ = decoder_lstm(decoder_embedding, initial_state=encoder_states)
+decoder_dense = Dense(len(tokenizer.word_index)+1, activation='softmax')
+decoder_outputs = decoder_dense(decoder_outputs)
+
+#
